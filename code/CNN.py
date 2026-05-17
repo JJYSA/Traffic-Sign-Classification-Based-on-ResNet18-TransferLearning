@@ -24,7 +24,7 @@ print(f"模型将在: {device} 上运行")
 
 # ===================== 3. 设置训练超参数 =====================
 BATCH_SIZE = 64    # 每次训练喂入模型的图片数量
-EPOCHS = 1         # 训练轮数
+EPOCHS = 2         # 训练轮数
 LEARNING_RATE = 0.001  # 学习率
 
 # ===================== 4. 数据预处理 =====================
@@ -79,28 +79,30 @@ test_loader = DataLoader(
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
-        # 卷积层1：输入通道（灰度图），输出通道16，卷积核3x3
-        self.conv1 = nn.Conv2d(3, 16, 3, 1)
-        # 池化层：最大池化，缩小图片尺寸（2x2）
-        self.pool = nn.MaxPool2d(2, 2)
-        # 卷积层2：输入通道16，输出通道32，卷积核3x3
-        self.conv2 = nn.Conv2d(16, 32, 3, 1)
-        # 全连接层1：特征展平后输入，输出128维
-        self.fc1 = nn.Linear(32 * 5 * 5, 128)
+        self.conv1 = nn.Conv2d(3, 16, 3, 1,1)
+        #一定要加padding，不然矩阵维数对不上
+        self.pool1 = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(16, 32, 3, 1,1)
+        self.pool2 = nn.MaxPool2d(2, 2)
+        self.conv3 = nn.Conv2d(32, 64, 3, 1,1)
+        self.pool3 = nn.MaxPool2d(2, 2)
+        # 全连接层1：特征展平后输入，输出128维。
+        #初始图像尺寸为600×800，经过三次2×2、步长为2的最大池化操作后得到75×100
+        self.fc1 = nn.Linear(64 * 75 * 100, 256)
         # 全连接层2：输出8维
-        self.fc2 = nn.Linear(128, 8)
+        self.fc2 = nn.Linear(256, 8)
 
     def forward(self, x):
         """前向传播：定义数据在模型中的流动路径"""
-        # 卷积1 + 激活函数 + 池化
-        x = self.pool(torch.relu(self.conv1(x)))
-        # 卷积2 + 激活函数 + 池化
-        x = self.pool(torch.relu(self.conv2(x)))
+        # 卷积 + 激活函数 + 池化
+        x = self.pool1(torch.relu(self.conv1(x)))
+        x = self.pool2(torch.relu(self.conv2(x)))
+        x = self.pool3(torch.relu(self.conv3(x)))
         # 展平：将多维特征图展平为一维向量 (batch_size, 特征数)
         x = torch.flatten(x, 1)
         # 全连接层1 + 激活函数
         x = torch.relu(self.fc1(x))
-        # 全连接层2：输出10个分类的概率
+        # 全连接层2：输出8个分类的概率
         x = self.fc2(x)
         return x
 
@@ -114,3 +116,44 @@ print(model)
 criterion = nn.CrossEntropyLoss()
 # Adam优化器：自动调整学习率，更新模型参数
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+
+# ===================== 8. 模型训练 =====================
+def train_model(model, loader, criterion, optimizer, epochs, device):
+    print("\n开始训练...")
+    # 遍历每一轮训练
+    for epoch in range(EPOCHS):
+        running_loss = 0.0  # 记录每轮的损失值
+        # 遍历批次数据，带进度条
+        pbar = tqdm(loader, desc=f"第{epoch+1}/{EPOCHS}轮")
+        for images, labels in pbar:
+            # 将数据移动到设备
+            images, labels = images.to(device), labels.to(device)
+            # 1. 梯度清零：防止上一批次的梯度累积
+            optimizer.zero_grad()
+            # 2. 前向传播：模型输出预测结果
+            outputs = model(images)
+            # 3. 计算损失：预测值和真实值的误差
+            loss = criterion(outputs, labels)
+            # 4. 反向传播：计算梯度
+            loss.backward()
+            # 5. 更新参数：优化器调整模型权重
+            optimizer.step()
+
+            # 累计损失
+            running_loss += loss.item()
+            # 更新进度条显示损失
+            pbar.set_postfix({"损失值": f"{loss.item():.3f}"})
+
+        # 打印每轮的平均损失
+        avg_loss = running_loss / len(loader)
+        print(f"第{epoch+1}轮训练完成，平均损失: {avg_loss:.3f}")
+
+    print("\n训练完成！")
+    return model
+
+# 开始训练
+model = train_model(model, train_loader, criterion, optimizer, EPOCHS, device)
+
+# 保存训练好的模型
+torch.save(model.state_dict(), "model.pth")
+print("模型已保存为: model.pth")
