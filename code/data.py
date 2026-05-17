@@ -7,6 +7,7 @@ import os
 # Download latest version
 path=kagglehub.dataset_download("zoltanszekely/mini-traffic-detection-dataset")
 print("Path to dataset files:", path)
+#现在是.jpg格式。不属于纯张量、Image 或 PIL 图像中的任何一种。
 
 #我不想它把数据下到C盘。但是kagglehub默认不支持直接指定路径。遂用移动文件夹的方式实现。
 
