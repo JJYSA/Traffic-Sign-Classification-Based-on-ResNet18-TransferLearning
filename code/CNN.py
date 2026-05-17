@@ -24,14 +24,16 @@ print(f"模型将在: {device} 上运行")
 
 # ===================== 3. 设置训练超参数 =====================
 BATCH_SIZE = 64    # 每次训练喂入模型的图片数量
-EPOCHS = 2         # 训练轮数
+EPOCHS = 5         # 训练轮数
 LEARNING_RATE = 0.001  # 学习率
 
 # ===================== 4. 数据预处理 =====================
 # PIL/image格式图片需要转换成张量image + 标准化
 transform = transforms.Compose([
     transforms.ToTensor(),  # 将PIL图片/ numpy数组 转换为 [0,1] 范围的张量 (通道, 高, 宽)
-    transforms.Normalize((0.1307,), (0.3081,))  # MNIST数据集的均值和标准差，用于标准化数据
+    # 通用RGB归一化，不能照抄MNIST！
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+    #把图片像素从 [0, 1] 缩放到 [-1, 1]
 ])
 #这段代码本身并不指定处理图像的位置，transform只是定义了对图像的预处理操作。
 
@@ -157,3 +159,70 @@ model = train_model(model, train_loader, criterion, optimizer, EPOCHS, device)
 # 保存训练好的模型
 torch.save(model.state_dict(), "model.pth")
 print("模型已保存为: model.pth")
+
+# ===================== 9. 模型推理 + 可视化测试集结果 =====================
+def infer_and_show_test_images(model, loader, device):
+    """
+    加载训练好的模型，对测试集图片推理
+    显示6张图片 + 打印推理结果
+    """
+    print("\n开始推理测试集图片...")
+    # 加载模型（如果需要重新加载，取消注释）
+    # model.load_state_dict(torch.load("mnist_digit_model.pth"))
+    # 切换为评估模式：关闭dropout、batchnorm等训练专用层
+    model.eval()
+
+    # 获取一个批次的6张测试图片
+    data_iter = iter(loader)
+    images, true_labels = next(data_iter)
+    images = images.to(device)
+
+    # 关闭梯度计算：推理时不需要计算梯度，加速+节省内存
+    with torch.no_grad():
+        outputs = model(images)
+        # 获取预测结果：取输出概率最大的类别
+        pred_labels = torch.argmax(outputs, dim=1)
+
+    # 转换为numpy数组，方便绘图
+    images = images.cpu().numpy()
+    true_labels = true_labels.numpy()
+    pred_labels = pred_labels.cpu().numpy()
+
+    # ===================== 可视化6张测试集图片 + 推理结果 =====================
+    plt.figure(figsize=(12, 8))
+    for i in range(6):
+        plt.subplot(2, 3, i + 1)
+        plt.xticks([])
+        plt.yticks([])
+        # 显示图片
+        img = images[i].squeeze()
+        # 调整维度顺序
+        img = img.transpose((1, 2, 0))
+        #img是numpy.ndarray类型
+        #反归一化，归一化，转了[-1, 1]后得做这一步逆运算，否则会变得很昏暗
+        img = (img * 0.5) + 0.5
+        plt.imshow(img)
+        #因为plt.imshow() 期望的图像数据形状是 (height, width, channels)，而原始传入的图像img数据形状是 (channels, height, width)
+        # 标题：真实值/预测值
+        color = "green" if true_labels[i] == pred_labels[i] else "red"
+        plt.title(f"真:{true_labels[i]}\n预:{pred_labels[i]}", color=color)
+
+    plt.tight_layout()
+    plt.suptitle('测试集推理结果（绿色=正确，红色=错误）', fontsize=16)
+    plt.show()
+
+    # ===================== 打印推理结果=====================
+    print("测试集6张图片推理结果：\n")
+    correct = 0
+    for i in range(6):
+        res = f"第{i+1}张 → 真实: {true_labels[i]}, 推理: {pred_labels[i]}"
+        if true_labels[i] == pred_labels[i]:
+            res += " ✅ 正确"
+            correct +=1
+        else:
+            res += " ❌ 错误"
+        print(res)
+    print(f"\n6张图片准确率: {correct/30*100:.2f}%")
+
+# 调用推理函数
+infer_and_show_test_images(model, test_loader, device)
