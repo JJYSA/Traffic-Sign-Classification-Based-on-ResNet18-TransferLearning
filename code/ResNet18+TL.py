@@ -15,7 +15,7 @@ plt.rcParams['axes.unicode_minus'] = False   # 解决负号变成方框的问题
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"运行设备: {device}")
 
-RESULT_SAVE_PATH = r"D:\GitHub\Traffic-Sign-Classification-Based-on-CNN\results"
+RESULT_SAVE_PATH = r"D:\GitHub\Traffic-Sign-Classification-Based-on-CNN\results"#请替换您自己的路径
 os.makedirs(RESULT_SAVE_PATH, exist_ok=True)
 
 # ===================== 超参数 =====================
