@@ -133,7 +133,7 @@ def train_model(model, loader, criterion, optimizer, epochs, device):
     for epoch in range(EPOCHS):
         running_loss = 0.0  # 记录每轮的损失值
         # 遍历批次数据，带进度条
-        pbar = tqdm(loader, desc=f"第{epoch+1}/{EPOCHS}轮")
+        pbar = tqdm(train_loader, desc=f"第{epoch+1}/{EPOCHS}轮", leave=False)
         for images, labels in pbar:
             # 将数据移动到设备
             images, labels = images.to(device), labels.to(device)
@@ -184,7 +184,7 @@ def infer_and_show_test_images(model, loader, device):
     images, true_labels = next(data_iter)
     images = images.to(device)
 
-    # 关闭梯度计算：推理时不需要计算梯度，加速+节省内存
+    # 关闭梯度计算：推理时不需要计算梯度
     with torch.no_grad():
         outputs = model(images)
         # 获取预测结果：取输出概率最大的类别
