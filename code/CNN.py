@@ -2,16 +2,11 @@ import torch
 # 神经网络层、损失函数、优化器等
 import torch.nn as nn
 import torch.optim as optim
-
 from torchvision import datasets, transforms
-#transforms模块提供多种图像变换方法，用于预处理图像数据。
-
 from torch.utils.data import DataLoader
-# 绘图工具：用于显示图片
 import matplotlib.pyplot as plt
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 用Windows自带的黑体显示中文
 plt.rcParams['axes.unicode_minus'] = False   # 解决负号变成方框的问题
-# 进度条工具：训练时显示进度
 from tqdm import tqdm
 import numpy as np
 
@@ -23,9 +18,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"模型将在: {device} 上运行")
 
 # ===================== 3. 设置训练超参数 =====================
-BATCH_SIZE = 10    # 每次训练喂入模型的图片数量
-#好家伙一个类别总共才21张训练图片，之前一次喂64居然没报错
-EPOCHS = 5         # 训练轮数
+BATCH_SIZE = 64    # 每次训练喂入模型的图片数量
+#好家伙一个类别总共才21张训练图片
+EPOCHS = 2         # 训练轮数
 LEARNING_RATE = 0.001  # 学习率
 
 # ===================== 4. 数据预处理 =====================
@@ -36,7 +31,9 @@ transform = transforms.Compose([
     transforms.ColorJitter(brightness=0.2, contrast=0.2),  # 随机亮度/对比度
     #数据增强
     transforms.ToTensor(),  # 将PIL图片/ numpy数组 转换为 [0,1] 范围的张量 (通道, 高, 宽)
-    # 通用RGB归一化，不能照抄MNIST！
+    # 通用RGB归一化，不能照抄MNIST(?)
+    transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                         std=[0.229, 0.224, 0.225])
 ])
 #这段代码本身并不指定处理图像的位置，transform只是定义了对图像的预处理操作。
 
@@ -110,17 +107,19 @@ class CNN(nn.Module):
         self.conv5 = nn.Conv2d(128, 256, 7, 1)
         self.pool5 = nn.MaxPool2d(2, 2)
         # 全连接层：特征展平后输入
-        self.fc1 = nn.Linear(7168, 1024)
+        self.fc1 = nn.Linear(58368, 1024)
         #原本236800输入也太离谱了
         self.fc2 = nn.Linear(1024, 256)
         self.fc3 = nn.Linear(256, 64)
         self.fc4 = nn.Linear(64, 8)
         #原本的全连接层跨度太离谱了。但是加全连接层会明显增加训练时间。而且loss还是不动啊。
-'''
-该用多少层?借鉴AlexNet 输入：224×224×3
-1. 卷积层总数：5 层 Conv
-2. 全连接层总数：3 层 FC
-'''
+        '''
+        该用多少层?
+        借鉴AlexNet 
+        输入：224×224×3
+        1. 卷积层总数：5 层 Conv
+        2. 全连接层总数：3 层 FC
+        '''
     def forward(self, x):
         """前向传播：定义数据在模型中的流动路径"""
         # 卷积 + 激活函数 + 池化
@@ -134,8 +133,9 @@ class CNN(nn.Module):
         # 全连接层1 + 激活函数
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        # 全连接层3：输出8个分类的概率
-        x = self.fc3(x)
+        x = torch.relu(self.fc3(x))
+        # 全连接层输出8个分类的概率
+        x = self.fc4(x)
         return x
 
 # 实例化模型，并移动到设备（GPU）
